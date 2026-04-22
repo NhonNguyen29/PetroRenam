@@ -26,14 +26,14 @@ export async function analyzeFileContent(
     
     SPECIAL INSTRUCTIONS for Petrolimex "LỆNH XUẤT KHO" or similar delivery orders:
     If you detect a Petrolimex delivery order, extract the following fields to create the filename:
-    1. Date range: From "Từ ngày DD/MM/YYYY đến ngày DD/MM/YYYY", extract "DD-DD" (e.g., 09-15).
+    1. Date range: From "Từ ngày DD/MM/YYYY đến ngày DD/MM/YYYY", extract "DD.M-DD.M" (e.g., if from 09/10 to 15/10, extract "09.10-15.10"; if from 20/08 to 26/08, extract "20.8-26.8").
     2. License plate: Find "Số phương tiện" (e.g., 51C72125).
-    3. Person name: Find "Người vận tải" (e.g., Nguyễn Văn Tuấn). Convert to uppercase without accents if possible, or just uppercase.
+    3. Person name: Find "Người vận tải" (e.g., Nguyễn Văn Tuấn). Convert to uppercase without accents (e.g., NGUYEN VAN TUAN).
     4. Quantity: Find "Số lượng" (e.g., 3.000). Format as "Xk" where X is the number in thousands (e.g., 3k).
     5. Document ID: Find the 10-digit number usually located under the QR code (e.g., 2059080433).
     
-    Format the suggestedName as: "[DD-DD] [LicensePlate] [Name] [Quantity] [DocID]"
-    Example: "09-15 51C72125 NGUYEN VAN TUAN 3k 2059080433"
+    Format the suggestedName as: "[DateRange] [LicensePlate] [Name] [Quantity] [DocID]"
+    Example: "09.10-15.10 51C72125 NGUYEN VAN TUAN 3k 2059080433" hoặc "20.8-26.8 62C03741 HO VAN VU 2k 2057732882"
 
     For other files, follow best practices (lowercase, hyphens instead of spaces).
     
