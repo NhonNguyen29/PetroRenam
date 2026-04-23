@@ -135,8 +135,8 @@ export default function App() {
 
     setIsProcessingAll(true);
     
-    // Concurrency limited processing (3 at a time)
-    const concurrency = 3;
+    // Concurrency limited processing (1 at a time for free tier stability)
+    const concurrency = 1;
     const items = [...idleFiles];
     
     const worker = async () => {
@@ -144,6 +144,10 @@ export default function App() {
         const item = items.shift();
         if (item) {
           await analyzeFile(item.id);
+          // Small delay between requests to be gentle on free quota
+          if (items.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         }
       }
     };
