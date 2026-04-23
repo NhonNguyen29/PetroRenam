@@ -46,10 +46,18 @@ export default function App() {
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [tokenUsage, setTokenUsage] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
-  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('GEMINI_API_KEY') || '');
+  const [apiKeys, setApiKeys] = useState<string[]>(() => {
+    const saved = localStorage.getItem('GEMINI_API_KEYS');
+    return saved ? JSON.parse(saved) : ['', '', ''];
+  });
+  const [activeKeyIndex, setActiveKeyIndex] = useState(() => {
+    const saved = localStorage.getItem('ACTIVE_KEY_INDEX');
+    return saved ? parseInt(saved, 10) : 0;
+  });
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  const hasApiKey = !!process.env.GEMINI_API_KEY || !!userApiKey;
+  const activeApiKey = apiKeys[activeKeyIndex];
+  const hasApiKey = !!process.env.GEMINI_API_KEY || !!activeApiKey;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -59,9 +67,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const saveApiKey = (key: string) => {
-    setUserApiKey(key);
-    localStorage.setItem('GEMINI_API_KEY', key);
+  const saveApiKey = (index: number, value: string) => {
+    const newKeys = [...apiKeys];
+    newKeys[index] = value;
+    setApiKeys(newKeys);
+    localStorage.setItem('GEMINI_API_KEYS', JSON.stringify(newKeys));
+  };
+
+  const selectActiveKey = (index: number) => {
+    setActiveKeyIndex(index);
+    localStorage.setItem('ACTIVE_KEY_INDEX', index.toString());
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -110,7 +125,7 @@ export default function App() {
 
     try {
       const base64 = await fileToBase64(fileItem.file);
-      const result = await analyzeFileContent(fileItem.file, base64, fileItem.file.type, userApiKey);
+      const result = await analyzeFileContent(fileItem.file, base64, fileItem.file.type, activeApiKey);
       
       setTokenUsage(prev => prev + Math.floor(fileItem.file.size / 100) + 500);
 
@@ -135,8 +150,8 @@ export default function App() {
 
     setIsProcessingAll(true);
     
-    // Concurrency limited processing (1 at a time for free tier stability)
-    const concurrency = 1;
+    // Concurrency limited processing (2 at a time for better speed)
+    const concurrency = 2;
     const items = [...idleFiles];
     
     const worker = async () => {
@@ -146,7 +161,7 @@ export default function App() {
           await analyzeFile(item.id);
           // Small delay between requests to be gentle on free quota
           if (items.length > 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
         }
       }
@@ -354,31 +369,59 @@ export default function App() {
               
               <div className="p-8 space-y-6">
                 <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
-                    <h4 className="text-sm font-bold text-[#004a99] flex items-center gap-2">
-                      <Zap size={16} /> Gemini API Key
-                    </h4>
-                    <p className="text-[10px] text-slate-500">Sử dụng API Key cá nhân của bạn để xử lý không giới hạn.</p>
-                    <div className="relative">
-                      <input 
-                        type="password"
-                        value={userApiKey}
-                        onChange={(e) => saveApiKey(e.target.value)}
-                        placeholder="Dán API Key từ Google AI Studio..."
-                        className="w-full bg-white border border-blue-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-[#004a99] outline-none pr-10"
-                      />
-                      {userApiKey && (
-                        <button 
-                          onClick={() => saveApiKey('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-500"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Danh sách API Keys</p>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Lưu tự động</span>
                   </div>
+                  
+                  {[0, 1, 2].map((index) => (
+                    <div 
+                      key={index}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all relative",
+                        activeKeyIndex === index 
+                          ? "bg-blue-50 border-blue-200 shadow-sm" 
+                          : "bg-slate-50 border-slate-100"
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-2 cursor-pointer">
+                          <input 
+                            type="radio" 
+                            name="activeKey"
+                            checked={activeKeyIndex === index}
+                            onChange={() => selectActiveKey(index)}
+                            className="w-4 h-4 text-[#004a99] focus:ring-[#004a99]"
+                          />
+                          Key #{index + 1}
+                        </label>
+                        {apiKeys[index] && activeKeyIndex === index && (
+                          <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                            <Check size={12} /> Đang dùng
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="password"
+                          value={apiKeys[index]}
+                          onChange={(e) => saveApiKey(index, e.target.value)}
+                          placeholder={`Dán Gemini API Key ${index + 1}...`}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-[#004a99] outline-none pr-10"
+                        />
+                        {apiKeys[index] && (
+                          <button 
+                            onClick={() => saveApiKey(index, '')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-500"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 pt-2">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Thống kê phiên làm việc</p>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Token ước tính:</span>
@@ -391,7 +434,7 @@ export default function App() {
                   onClick={() => setShowSettings(false)}
                   className="w-full py-3 bg-[#004a99] text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
                 >
-                  Đóng thiết lập
+                  Hoàn tất
                 </button>
               </div>
             </motion.div>
@@ -469,11 +512,11 @@ export default function App() {
                 </button>
                 <button 
                   onClick={analyzeAll}
-                  disabled={isProcessingAll || files.every(f => f.status === 'done')}
+                  disabled={isProcessingAll || files.every(f => f.status === 'done') || !hasApiKey}
                   className="flex items-center gap-2 px-6 py-2.5 bg-[#004a99] text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100 disabled:opacity-50 disabled:grayscale"
                 >
                   {isProcessingAll ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                  Phân tích nhanh
+                  {!hasApiKey ? 'Chưa nhập API Key' : 'Phân tích nhanh'}
                 </button>
                 
                 <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
